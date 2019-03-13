@@ -1,17 +1,17 @@
 #include <avr/pgmspace.h>
 #include <Tone.h>
 
-Tone tone1;
-Tone tone2;
-Tone tone3;
-Tone tone4;
-Tone tone5;
-
 uint16_t d1duration = 0;
 uint16_t d2duration = 0;
 uint16_t d3duration = 0;
 uint16_t d4duration = 0;
 uint16_t d5duration = 0;
+
+Tone tone1;
+Tone tone2;
+Tone tone3;
+Tone tone4;
+Tone tone5;
 
 // data = purple
 // data1 = yellow
@@ -34,15 +34,21 @@ uint16_t active_lights[] = {0, 0, 0, 0, 0};
 static const uint16_t light_ports[] = {23, 25, 27, 28, 30, 27, 26, 33, 32, 22};
 
 void setup() {
-    
-  tone1.begin(2);
-  tone2.begin(4);
-  tone3.begin(6);
-  tone4.begin(7);
-  tone5.begin(12);
+  Serial.begin(9600);
 
   for (int i = 0; i < 10; ++i)
     pinMode(light_ports[i], OUTPUT);
+
+  tone1.begin(37);
+  tone2.begin(36);
+  tone3.begin(48);
+  tone4.begin(24);
+  tone5.begin(49);
+//  tone1.begin(26);
+//  tone2.begin(2);
+//  tone3.begin(4);
+//  tone4.begin(6);
+//  tone5.begin(7);
     
 }
 
@@ -52,7 +58,7 @@ void loop() {
 
 // Track 0 - Untitled
 static const uint16_t Melody0[] PROGMEM = {
-0b0110111101010011, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
+0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
 0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
 0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
 0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
@@ -582,7 +588,7 @@ static const uint16_t Melody0[] PROGMEM = {
 0b1111111101100000, 0b1111111101100000, 0b1111111101100000, 0b1111111101100000,
 0b1111111101100000, 0b1111111101100000, 0b1111111101100000, 0b1111111101100000,
 0b1111111101100000, 0b0000111101100000, 0b1111111101110000, 0b1111111101110000,
-0b1111111101110000, 0b1111111101110000, 0b1111111101110000, 0b1111111101110000,
+/*0b1111111101110000, 0b1111111101110000, 0b1111111101110000, 0b1111111101110000,
 0b1111111101110000, 0b1000011001110000, 0b1111111111111111, 0b1111111111111111,
 0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
 0b1111111111111111, 0b1111111111111111, 0b1111111111111111, 0b1111111111111111,
@@ -923,7 +929,7 @@ static const uint16_t Melody0[] PROGMEM = {
 0b0000000111111111, 0b1110111101101010, 0b0000000111111111, 0b1111111101110000,
 0b1110000001110000, 0b0000000111111111, 0b1001111101110000, 0b0000000111111111,
 0b1001111101110000, 0b0000000111111111, 0b1001111101110000, 0b0000000111111111,
-0b1111111101110000, 0b1110000001110000,
+0b1111111101110000, 0b1110000001110000,*/
 };
 static const uint16_t Melody0_Length    = sizeof( Melody0 ) / sizeof(uint16_t);
 
@@ -8422,69 +8428,66 @@ static const uint16_t Melody4[] PROGMEM = {
 };
 static const uint16_t Melody4_Length    = sizeof( Melody4 ) / sizeof(uint16_t);
 
-void playNote(uint16_t data, Tone tone_handler, uint16_t light_array_pos) {
+uint16_t playNote(uint16_t data, Tone toneHandler, uint16_t light_array_pos) {
   static const uint16_t Freq8[] PROGMEM = {4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902};
-  uint16_t duration = (data >> 8) / 2;
+  uint16_t duration = (data >> 8) * 10;
 
   if ((data & 0xF) == 0xF) {
-    tone_handler.stop();
+    toneHandler.stop();
     active_lights[light_array_pos] = 0;
   } else {
     uint16_t Freq = pgm_read_word(&Freq8[data & 0xF]) / (1 << (8 - (data >> 4 & 0xF)));
     uint16_t port = Freq % 10;
     active_lights[light_array_pos] = light_ports[port];
-    tone_handler.play(Freq, duration);
+    toneHandler.play(Freq);
   }
+
+  return duration;
 }
 
 void playAll() {
   
-//  if (!tone1.isPlaying() && x1 < Melody0_Length) {
-//    data = pgm_read_word((uint16_t *)&Melody0[x1]);
-//    ++x1;
-//    playNote(data, tone1, 0);
-//  } else if (x1 >= Melody0_Length) {
-//      data = 0xF;
-//  }
+  if (d1duration == 0 && x1 < Melody0_Length) {
+    data = pgm_read_word((uint16_t *) &Melody0[x1]);
+    ++x1;
+  } else if (x1 >= Melody0_Length) {
+      data = 0xF;
+  }
+  d1duration = (d1duration == 0) ? playNote(data, tone1, 0) : d1duration - 1;
 
-  if (!tone2.isPlaying() && x2 < Melody1_Length) {
+  if (d2duration == 0 && x2 < Melody1_Length) {
     data1 = pgm_read_word(( uint16_t * ) &Melody1[x2]);
     ++x2;
-    playNote(data1, tone2, 1);
   } else if (x2 >= Melody1_Length) {
       data1 = 0xF;
   }
+  d2duration = (d2duration == 0) ? playNote(data1, tone3, 1) : d2duration - 1;
 
-  if (!tone3.isPlaying() && x3 < Melody2_Length) {
+  if (d3duration == 0 && x3 < Melody2_Length) {
     data2 = pgm_read_word(( uint16_t * ) &Melody2[x3]);
     ++x3;
-    playNote(data2, tone3, 2);
   } else if (x3 >= Melody2_Length) {
       data2 = 0xF;
   }
+  d3duration = (d3duration == 0) ? playNote(data2, tone2, 2) : d3duration - 1;
   
-//  if (!tone4.isPlaying() && x4 < Melody3_Length) {
-//    data3 = pgm_read_word(( uint16_t * ) &Melody3[x4]);
-//    ++x4;
-//    playNote(data3, tone4, 3);
-//  } else if (x4 >= Melody3_Length) {
-//      data3 = 0xF;
-//  }
+  if (d4duration == 0 && x4 < Melody3_Length) {
+    data3 = pgm_read_word(( uint16_t * ) &Melody3[x4]);
+    ++x4;
+  } else if (x4 >= Melody3_Length) {
+      data3 = 0xF;
+  }
+  d4duration = (d4duration == 0) ? playNote(data3, tone4, 3) : d4duration - 1;
 
-//  if (!tone5.isPlaying() && x5 < Melody4_Length) {
-//    data4 = pgm_read_word((uint16_t *)&Melody4[x5]);
-//    ++x5;
-//    playNote(data4, tone5, 4);
-//  } else if (x5 >= Melody4_Length) {
-//      data4 = 0xF;
-//  }
+  if (d5duration == 0 && x5 < Melody4_Length) {
+    data4 = pgm_read_word((uint16_t *)&Melody4[x5]);
+    ++x5;
+  } else if (x5 >= Melody4_Length) {
+      data4 = 0xF;
+  }
+  d5duration = (d5duration == 0) ? playNote(data4, tone5, 4) : d5duration - 1;
 
   for (uint16_t light : light_ports) {
     digitalWrite(light, light == active_lights[0] || light == active_lights[1] || light == active_lights[2] || light == active_lights[3] || light == active_lights[4]);
-//    if (light != active_lights[0] && light != active_lights[1] && light != active_lights[2] && light != active_lights[3] && light != active_lights[4]) {
-//      digitalWrite(light, LOW);
-//    } else {
-//      digitalWrite(light, HIGH);
-//    }
   }
 }
