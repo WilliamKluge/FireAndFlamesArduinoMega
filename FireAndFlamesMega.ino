@@ -1,20 +1,36 @@
+/**
+ * Author: William Kluge <klugewilliam@gmail.com>
+ * 
+ * Shoutouts:
+ *  Awesome MIDI converter - https://sparks.gogo.co.nz/midi_tone.html
+ *  MIDI file used - https://musescore.com/user/4404/scores/35644
+ *    I edited it so that all the tracks would start at the same time when put into the converter (just added a note at the start)
+ */
 #include <avr/pgmspace.h>
 #include <Tone.h>
 
 #define BUTTON_PIN 18
+#define SWITCH_PIN 53
+// Magic variable for controlling how fast the song goes
+#define TEMPO_MODIFIER 7.56
 
-uint16_t d1duration = 0;
-uint16_t d2duration = 0;
-uint16_t d3duration = 0;
-uint16_t d4duration = 0;
-uint16_t d5duration = 0;
-
+// These are what actually play the notes
 Tone tone1;
 Tone tone2;
 Tone tone3;
 Tone tone4;
 Tone tone5;
 
+// Duration remaining for each track
+// We need all the timers to actually play the tones so we can't use millis anymore
+uint16_t d1duration = 0;
+uint16_t d2duration = 0;
+uint16_t d3duration = 0;
+uint16_t d4duration = 0;
+uint16_t d5duration = 0;
+
+// Data from each track of the MIDI
+// (Colors are from the MIDI file played in Synthesia)
 // data = purple
 // data1 = yellow
 // data2 = orange
@@ -26,51 +42,52 @@ uint16_t data2 = 0;
 uint16_t data3 = 0;
 uint16_t data4 = 0;
 
+// Positions in the tracks
 uint16_t x1 = 0;
 uint16_t x2 = 0;
 uint16_t x3 = 0;
 uint16_t x4 = 0;
 uint16_t x5 = 0;
 
+// LEDs currently turned on (associated with the Tone that is lighting them)
 uint16_t active_lights[] = {0, 0, 0, 0, 0};
+// Pins of LEDs in their order of where they are on the breadboard
 static const uint16_t light_ports[] = {23, 40, 38, 36, 32, 30, 28, 25, 27, 22};
 
+// Amount of time to spend cycling through the lights at the start of the song
 unsigned long timePassedRequirement = 2000;
-unsigned long timerStartTime;
-unsigned long lastLEDTime;
 
-int prevLight = 0;
-short switchPin = 53;
-int previousState = 0;
-
-// Keeps track of if 
+// Keeps track of if the tones should actually be played
 volatile bool muted = false;
 
 void setup() {
   for (int i = 0; i < 10; ++i)
     pinMode(light_ports[i], OUTPUT);
 
-  Serial.begin(9600);
-
-  pinMode(switchPin, INPUT);
-  timerStartTime = millis();
+  pinMode(SWITCH_PIN, INPUT);
 
   hourglass();
 
+  // TL;DR just mute/unmute on a button press
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), changeMute, RISING);
 
+  // Assign tones after hourglass is so that we can use all 5 hardware timers
   tone1.begin(2);
   tone2.begin(3);
   tone3.begin(4);
   tone4.begin(7);
   tone5.begin(11);
-    
 }
 
+/**
+ * Cycles through the lights and restarts if the switch is shaken
+ */
 void hourglass() {
   int i = 0;
-  lastLEDTime = millis();
+  int previousState = 0;
+  unsigned long timerStartTime = millis();
+  unsigned long lastLEDTime = timerStartTime;
   
   while (millis() - timerStartTime < timePassedRequirement) {
     if (millis() - lastLEDTime > timePassedRequirement / 11) {
@@ -78,21 +95,23 @@ void hourglass() {
       lastLEDTime = millis();
     }
     
-    int state = digitalRead(switchPin);
-    Serial.print(state);
-    Serial.print("\n");
+    int state = digitalRead(SWITCH_PIN);
     if (state != previousState) {
-      Serial.print("Stopped\n");
       // Turn off all the lights
-      while (i >= 0) {
+      while (i >= 0) 
         digitalWrite(light_ports[i--], LOW);
-      }
+        
       timerStartTime = millis();
     }
     previousState = state;
   }
 }
 
+/**
+ * Mutes/un-mutes the song. Lights will keep flashing.
+ * 
+ * Controlled by inturrupt on the button.
+ */
 void changeMute() {
   muted = !muted;
 }
@@ -8471,11 +8490,11 @@ static const uint16_t Melody4[] PROGMEM = {
 0b0000000111111111, 0b0000000000110111, 0b1001111101110000, 0b0000000111111111,
 0b0000000001000000, 0b1111111101110000, 0b1110000001110000, 0b0000000011111111,
 };
-static const uint16_t Melody4_Length    = sizeof( Melody4 ) / sizeof(uint16_t);
+static const uint16_t Melody4_Length = sizeof( Melody4 ) / sizeof(uint16_t);
 
 uint16_t playNote(uint16_t data, Tone toneHandler, uint16_t light_array_pos) {
   static const uint16_t Freq8[] PROGMEM = {4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902};
-  uint16_t duration = (data >> 8) * 10;
+  uint16_t duration = (data >> 8) * TEMPO_MODIFIER;
 
   if ((data & 0xF) == 0xF) {
     toneHandler.stop();
@@ -8492,7 +8511,6 @@ uint16_t playNote(uint16_t data, Tone toneHandler, uint16_t light_array_pos) {
 }
 
 void playAll() {
-  
   if (d1duration == 0 && x1 < Melody0_Length) {
     data = pgm_read_word((uint16_t *) &Melody0[x1]);
     ++x1;
@@ -8535,5 +8553,14 @@ void playAll() {
 
   for (uint16_t light : light_ports) {
     digitalWrite(light, light == active_lights[0] || light == active_lights[1] || light == active_lights[2] || light == active_lights[3] || light == active_lights[4]);
+  }
+
+  // If the song is over
+  if (x5 >= Melody4_Length) {
+    x1 = 0;
+    x2 = 0;
+    x3 = 0;
+    x4 = 0;
+    x5 = 0;
   }
 }
