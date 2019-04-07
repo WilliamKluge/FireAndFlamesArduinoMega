@@ -52,10 +52,10 @@ uint16_t x5 = 0;
 // LEDs currently turned on (associated with the Tone that is lighting them)
 uint16_t active_lights[] = {0, 0, 0, 0, 0};
 // Pins of LEDs in their order of where they are on the breadboard
-static const uint16_t light_ports[] = {23, 40, 38, 36, 32, 30, 28, 25, 27, 22};
+static const uint16_t light_ports[] = {22, 27, 25, 28, 30, 32, 36, 38, 40, 23};
 
 // Amount of time to spend cycling through the lights at the start of the song
-unsigned long timePassedRequirement = 2000;
+unsigned long timePassedRequirement = 4000;
 
 // Keeps track of if the tones should actually be played
 volatile bool muted = false;
@@ -65,6 +65,7 @@ void setup() {
     pinMode(light_ports[i], OUTPUT);
 
   pinMode(SWITCH_PIN, INPUT);
+  Serial.begin(9600);
 
   hourglass();
 
@@ -91,16 +92,19 @@ void hourglass() {
   
   while (millis() - timerStartTime < timePassedRequirement) {
     if (millis() - lastLEDTime > timePassedRequirement / 11) {
-      digitalWrite(light_ports[i++], RISING);
+      digitalWrite(light_ports[i++], HIGH);
       lastLEDTime = millis();
     }
     
     int state = digitalRead(SWITCH_PIN);
+    Serial.print(state);
+    Serial.print("\n");
     if (state != previousState) {
+      Serial.print("Stopped\n");
       // Turn off all the lights
-      while (i >= 0) 
+      while (i > 0) {
         digitalWrite(light_ports[i--], LOW);
-        
+      }
       timerStartTime = millis();
     }
     previousState = state;
