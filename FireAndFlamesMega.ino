@@ -1,6 +1,8 @@
 #include <avr/pgmspace.h>
 #include <Tone.h>
 
+#define BUTTON_PIN 18
+
 uint16_t d1duration = 0;
 uint16_t d2duration = 0;
 uint16_t d3duration = 0;
@@ -31,25 +33,68 @@ uint16_t x4 = 0;
 uint16_t x5 = 0;
 
 uint16_t active_lights[] = {0, 0, 0, 0, 0};
-static const uint16_t light_ports[] = {23, 25, 27, 28, 30, 27, 26, 33, 32, 22};
+static const uint16_t light_ports[] = {23, 40, 38, 36, 32, 30, 28, 25, 27, 22};
+
+unsigned long timePassedRequirement = 2000;
+unsigned long timerStartTime;
+unsigned long lastLEDTime;
+
+int prevLight = 0;
+short switchPin = 53;
+int previousState = 0;
+
+// Keeps track of if 
+volatile bool muted = false;
 
 void setup() {
-  Serial.begin(9600);
-
   for (int i = 0; i < 10; ++i)
     pinMode(light_ports[i], OUTPUT);
 
-  tone1.begin(37);
-  tone2.begin(36);
-  tone3.begin(48);
-  tone4.begin(24);
-  tone5.begin(49);
-//  tone1.begin(26);
-//  tone2.begin(2);
-//  tone3.begin(4);
-//  tone4.begin(6);
-//  tone5.begin(7);
+  Serial.begin(9600);
+
+  pinMode(switchPin, INPUT);
+  timerStartTime = millis();
+
+  hourglass();
+
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), changeMute, RISING);
+
+  tone1.begin(2);
+  tone2.begin(3);
+  tone3.begin(4);
+  tone4.begin(7);
+  tone5.begin(11);
     
+}
+
+void hourglass() {
+  int i = 0;
+  lastLEDTime = millis();
+  
+  while (millis() - timerStartTime < timePassedRequirement) {
+    if (millis() - lastLEDTime > timePassedRequirement / 11) {
+      digitalWrite(light_ports[i++], RISING);
+      lastLEDTime = millis();
+    }
+    
+    int state = digitalRead(switchPin);
+    Serial.print(state);
+    Serial.print("\n");
+    if (state != previousState) {
+      Serial.print("Stopped\n");
+      // Turn off all the lights
+      while (i >= 0) {
+        digitalWrite(light_ports[i--], LOW);
+      }
+      timerStartTime = millis();
+    }
+    previousState = state;
+  }
+}
+
+void changeMute() {
+  muted = !muted;
 }
 
 void loop() {
@@ -8439,7 +8484,8 @@ uint16_t playNote(uint16_t data, Tone toneHandler, uint16_t light_array_pos) {
     uint16_t Freq = pgm_read_word(&Freq8[data & 0xF]) / (1 << (8 - (data >> 4 & 0xF)));
     uint16_t port = Freq % 10;
     active_lights[light_array_pos] = light_ports[port];
-    toneHandler.play(Freq);
+    if (!muted)
+      toneHandler.play(Freq);
   }
 
   return duration;
@@ -8453,7 +8499,7 @@ void playAll() {
   } else if (x1 >= Melody0_Length) {
       data = 0xF;
   }
-  d1duration = (d1duration == 0) ? playNote(data, tone1, 0) : d1duration - 1;
+  d1duration = (d1duration == 0) ? playNote(data, tone3, 0) : d1duration - 1;
 
   if (d2duration == 0 && x2 < Melody1_Length) {
     data1 = pgm_read_word(( uint16_t * ) &Melody1[x2]);
@@ -8461,7 +8507,7 @@ void playAll() {
   } else if (x2 >= Melody1_Length) {
       data1 = 0xF;
   }
-  d2duration = (d2duration == 0) ? playNote(data1, tone3, 1) : d2duration - 1;
+  d2duration = (d2duration == 0) ? playNote(data1, tone1, 1) : d2duration - 1;
 
   if (d3duration == 0 && x3 < Melody2_Length) {
     data2 = pgm_read_word(( uint16_t * ) &Melody2[x3]);
